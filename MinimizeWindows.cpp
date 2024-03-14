@@ -4,6 +4,7 @@
 
 struct State {
 	HWND m_window;
+	WINDOWPLACEMENT m_placement;
 };
 
 
@@ -40,7 +41,11 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM) {
 		return TRUE;
 	}
 
-	allWindows.emplace_back(State{ hwnd });
+	State state{ hwnd };
+	state.m_placement.length = sizeof(state.m_placement);
+	GetWindowPlacement(hwnd, &state.m_placement);
+
+	allWindows.emplace_back(state);
 	return TRUE;
 }
 
@@ -57,12 +62,14 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 
 				if (allWindows.empty()) {
 					for (auto i = lastWindows.rbegin(); i != lastWindows.rend(); ++i) {
-						SetWindowPos(i->m_window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+						SetWindowPlacement(i->m_window, &i->m_placement);
 					}
 				}
 				else {
 					for (const auto& state : allWindows) {
-						SetWindowPos(state.m_window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_HIDEWINDOW);
+						auto placement = state.m_placement;
+						placement.showCmd = SW_SHOWMINNOACTIVE;
+						SetWindowPlacement(state.m_window, &placement);
 					}
 				}
 
