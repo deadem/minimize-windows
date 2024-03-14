@@ -1,9 +1,21 @@
 #include "framework.h"
 #include "MinimizeWindows.h"
+#include <vector>
 
-BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
+struct State {
+	HWND m_window;
+};
 
+
+std::vector<State> lastWindows;
+std::vector<State> allWindows;
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM) {
 	if (!IsWindowVisible(hwnd)) {
+		return TRUE;
+	}
+
+	LONG style = GetWindowLong(hwnd, GWL_STYLE);
+	if (style & WS_MINIMIZE) {
 		return TRUE;
 	}
 
@@ -28,9 +40,7 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
 		return TRUE;
 	}
 
-	ShowWindow(hwnd, SW_SHOWMINNOACTIVE);
-
-	// Continue enumeration
+	allWindows.emplace_back(State{ hwnd });
 	return TRUE;
 }
 
@@ -42,8 +52,21 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 			// Check if 'D' is pressed along with the Windows key
 			if (pKeyboardStruct->vkCode == 'D' && (GetAsyncKeyState(VK_LWIN) & 0x8000 || GetAsyncKeyState(VK_RWIN) & 0x8000)) {
 
-				// Minimize all on main Desktop
+				allWindows.clear();
 				EnumWindows(EnumWindowsProc, 0);
+
+				if (allWindows.empty()) {
+					for (auto i = lastWindows.rbegin(); i != lastWindows.rend(); ++i) {
+						SetWindowPos(i->m_window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+					}
+				}
+				else {
+					for (const auto& state : allWindows) {
+						SetWindowPos(state.m_window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_HIDEWINDOW);
+					}
+				}
+
+				lastWindows = allWindows;
 
 				return 1; // Prevent the event from being passed on to other applications
 			}
